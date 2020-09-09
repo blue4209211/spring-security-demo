@@ -68,7 +68,8 @@ class CreateUserForm extends Component {
                            className="form-control"
                             value={this.state.role} onChange={this.handleInputChange} required>
                         <option value="ACCOUNT_ADMIN">ADMIN</option>
-                        <option value="ACCOUNT_USER">USER</option>
+                        <option value="ACCOUNT_SECURITY_ENGINEER">SECURITY ENGINEER</option>
+                        <option value="ACCOUNT_DEVELOPER">DEVELOPER</option>
                     </select>
                 </div>
                 <div className="form-item">

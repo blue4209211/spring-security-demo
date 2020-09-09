@@ -58,14 +58,14 @@ public class AccountsController {
 
     @GetMapping("/{accountId}/events")
     public List<AuditEventLog> getAccountEvents(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal) {
-        Account account = authorizationUtils.loggedInUserAuthorizedToListEntity(accountId, userPrincipal);
+        Account account = authorizationUtils.isloggedInUserAuthorized(accountId, userPrincipal, AccountsPermissionsEnum.ACCOUNT_LIST_EVENTS);
         return auditEventLogRepository.findByAccountIdOrderByTimestampDesc(account.getId());
     }
 
 
     @GetMapping("/{accountId}/users")
-    public List<UserAccountOnlyDescribeResponse> getAllUser(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal) {
-        Account account = authorizationUtils.loggedInUserAuthorizedToListEntity(accountId, userPrincipal);
+    public List<UserAccountOnlyDescribeResponse> listUsers(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal) {
+        Account account = authorizationUtils.isloggedInUserAuthorized(accountId, userPrincipal, AccountsPermissionsEnum.ACCOUNT_LIST_USER);
         return userRepository.findByUserTypeAndRolesAccount(UserTypeEnum.USER, account)
                 .stream()
                 .map(u -> new UserAccountOnlyDescribeResponse(u, account))
@@ -74,7 +74,7 @@ public class AccountsController {
 
     @PostMapping("/{accountId}/users")
     public UserAccountRegisterResponse registerUserToAccount(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal, @Valid @RequestBody UserAccountRegisterRequest userRegisterRequest) {
-        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+        Account account = authorizationUtils.isloggedInUserAuthorized(accountId, userPrincipal, AccountsPermissionsEnum.ACCOUNT_ADD_USER);
         if (appProperties.getAdmin().getAccountId() == accountId && userRegisterRequest.getRole() == DefaultSystemRolesEnum.SUPER_ADMIN) {
             throw new BadRequestException("SUPER_ADMIN Role is not allowed");
         }
@@ -90,6 +90,9 @@ public class AccountsController {
             userOptional = Optional.of(user);
         }
         Optional<Role> role = roleRepository.getByNameIgnoreCase(userRegisterRequest.getRole().name());
+        //remove existing roles of USER and Then add new Role,
+        //Its possible to have more than One role, though this is for simplicity
+        accountUserRoleRepository.deleteByAccountAndUser(account,userOptional.get());
         accountUserRoleRepository.save(new AccountUserRole(account, userOptional.get(), role.get()));
 
         Map<String, Object> data = new HashMap<>();
@@ -113,7 +116,7 @@ public class AccountsController {
 
     @GetMapping("/{accountId}/users/{userId}")
     public UserAccountOnlyDescribeResponse getUser(@PathVariable("accountId") Long accountId, @PathVariable("userId") Long userId, @CurrentUser IUserPrincipal userPrincipal) {
-        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+        Account account = authorizationUtils.isloggedInUserAuthorized(accountId, userPrincipal, AccountsPermissionsEnum.ACCOUNT_DESCRIBE_USER);
 
         Optional<User> u = userRepository.findById(userPrincipal.getId());
         if (u.isPresent()) {
@@ -124,7 +127,7 @@ public class AccountsController {
 
     @DeleteMapping("/{accountId}/users/{userId}")
     public UserDeleteFromAccountResponse deleteUser(@CurrentUser IUserPrincipal userPrincipal, @PathVariable("accountId") long accountId, @PathVariable("userId") long userId) {
-        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+        Account account = authorizationUtils.isloggedInUserAuthorized(accountId, userPrincipal, AccountsPermissionsEnum.ACCOUNT_REMOVE_USER);
         Optional<User> userOptional = userRepository.findById(userId);
         if (!userOptional.isPresent()) {
             throw new ResourceNotFoundException("user", "id", userId);
@@ -148,32 +151,32 @@ public class AccountsController {
 
 
     @GetMapping("/{accountId}/tokens")
-    public List<UserAccountOnlyDescribeResponse> getAllAgents(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal) {
-        Account account = authorizationUtils.loggedInUserAuthorizedToListEntity(accountId, userPrincipal);
-        return userRepository.findByUserTypeAndRolesAccount(UserTypeEnum.AGENT, account)
+    public List<UserAccountOnlyDescribeResponse> listTokens(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal) {
+        Account account = authorizationUtils.isloggedInUserAuthorized(accountId, userPrincipal, AccountsPermissionsEnum.ACCOUNT_LIST_TOKEN);
+        return userRepository.findByUserTypeAndRolesAccount(UserTypeEnum.TOKEN, account)
                 .stream()
                 .map(u -> new UserAccountOnlyDescribeResponse(u, account))
                 .collect(Collectors.toList());
     }
 
     @PostMapping("/{accountId}/tokens")
-    public ResponseEntity<?> registerAgent(@PathVariable("accountId") long accountId, @CurrentUser IUserPrincipal userPrincipal, @Valid @RequestBody TokenCreateRequest signUpRequest) {
-        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+    public ResponseEntity<?> addToken(@PathVariable("accountId") long accountId, @CurrentUser IUserPrincipal userPrincipal, @Valid @RequestBody TokenCreateRequest signUpRequest) {
+        Account account = authorizationUtils.isloggedInUserAuthorized(accountId, userPrincipal, AccountsPermissionsEnum.ACCOUNT_ADD_TOKEN);
 
         String clientSecret = PasswordUtils.generateSecureRandomPassword();
-        User agent = new User(String.format("%s-%s-%s", accountId, System.currentTimeMillis(), "client-id"), passwordEncoder.encode(clientSecret));
+        User token = new User(String.format("%s-%s-%s", accountId, System.currentTimeMillis(), "client-id"), passwordEncoder.encode(clientSecret));
 
         final HashSet<AccountUserRole> roles = new HashSet<AccountUserRole>();
         Optional<Role> role = roleRepository.getByNameIgnoreCase(DefaultSystemRolesEnum.DATA_ACCESS.name());
-        roles.add(new AccountUserRole(account, agent, role.get()));
-        agent.setRoles(roles);
-        agent.setUserType(UserTypeEnum.AGENT);
+        roles.add(new AccountUserRole(account, token, role.get()));
+        token.setRoles(roles);
+        token.setUserType(UserTypeEnum.TOKEN);
 
         final List<UserAttr> userAttrs = new ArrayList<>();
-        userAttrs.add(new UserAttr(UserAttr.USER_NAME, signUpRequest.getName(), agent));
-        agent.setUserAttrs(userAttrs);
+        userAttrs.add(new UserAttr(UserAttr.USER_NAME, signUpRequest.getName(), token));
+        token.setUserAttrs(userAttrs);
 
-        User result = userRepository.save(agent);
+        User result = userRepository.save(token);
 
         Map<String, Object> data = new HashMap<>();
         data.put("id", result.getId());
@@ -185,15 +188,15 @@ public class AccountsController {
         }
 
 
-        AgentCreateResponse res = new AgentCreateResponse();
-        res.setClientId(agent.getUserId());
+        TokenCreateResponse res = new TokenCreateResponse();
+        res.setClientId(token.getUserId());
         res.setClientSecret(clientSecret);
         return ResponseEntity.ok(res);
     }
 
     @DeleteMapping("/{accountId}/tokens/{tokenId}")
     public UserDeleteFromAccountResponse deleteToken(@CurrentUser IUserPrincipal userPrincipal, @PathVariable("accountId") Long accountId, @PathVariable("tokenId") Long tokenId) {
-        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+        Account account = authorizationUtils.isloggedInUserAuthorized(accountId, userPrincipal, AccountsPermissionsEnum.ACCOUNT_REMOVE_TOKEN);
 
         if (!userRepository.existsById(tokenId)) {
             throw new ResourceNotFoundException("token", "id", tokenId);

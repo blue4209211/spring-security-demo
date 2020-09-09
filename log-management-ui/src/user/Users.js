@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import './Users.css';
-import {listUsers,createUser,onCurrentAccountChange} from '../util/APIUtils';
+import {listUsers, createUser, deleteUser, onCurrentAccountChange, getCurrentAccount} from '../util/APIUtils';
 import LoadingIndicator from '../common/LoadingIndicator';
 
 class Users extends Component {
@@ -42,12 +42,20 @@ class Users extends Component {
         this.props.history.push("/user-create");
     }
 
-    removeUser = (agent) => {
-        console.log(agent)
+    removeUser = (user) => {
+        deleteUser(user.id)
+            .then( r => {
+                this.getUsers()
+            })
     }
 
-    disableUser = (agent) => {
-        console.log(agent)
+    getUserRoleForCurrentAccount = (user) => {
+        let account = getCurrentAccount();
+        for (let r of user.roles) {
+            if (r.accountId == account.id) {
+                return r.name
+            }
+        }
     }
 
     render() {
@@ -58,34 +66,40 @@ class Users extends Component {
             <div className="users-container">
                 <div className="container">
                     {
-                        this.props.hasRole(["SUPER_ADMIN","ACCOUNT_ADMIN"]) ?
+                        this.props.hasRole(["SUPER_ADMIN", "ACCOUNT_ADMIN"]) ?
                             <div id={"userCreateActions"}>
-                                <button type="submit" className="btn btn-small btn-primary" onClick={this.createUser}>Register User</button>
+                                <button type="submit" className="btn btn-small btn-primary"
+                                        onClick={this.createUser}>Register User
+                                </button>
                             </div>
                             : ""
                     }
-                    <div  id={"users-listings-container"}>
-                        <table  id={"users-listing"}>
+                    <div id={"users-listings-container"}>
+                        <table id={"users-listing"}>
                             <thead>
-                                <tr>
-                                    <th width={'200px'}>User Id</th>
-                                    <th width={'100px'}>User Name</th>
-                                    <th width={'100px'}>Created On</th>
-                                    <th width={'100px'}>Status</th>
-                                    <th width={'100px'}>Login Type</th>
-                                    <th width={'100px'}>Action</th>
-                                </tr>
+                            <tr>
+                                <th width={'200px'}>User Id</th>
+                                <th width={'100px'}>User Name</th>
+                                <th width={'100px'}>Role</th>
+                                <th width={'100px'}>Created On</th>
+                                <th width={'100px'}>Status</th>
+                                <th width={'100px'}>Login Type</th>
+                                <th width={'100px'}>Action</th>
+                            </tr>
                             </thead>
                             <tbody>
                             {this.state.users.map((item, index) => (
                                 <tr className="ul li" key={index}>
                                     <td>{item.userId}</td>
                                     <td>{item.name}</td>
+                                    <td>{this.getUserRoleForCurrentAccount(item)}</td>
                                     <td>{item.createdOn}</td>
                                     <td>{item.status}</td>
                                     <td>{item.authProvider}</td>
                                     <td>
-                                        <button onClick={(e) => this.removeUser(item)} className="btn btn-small">Delete</button>
+                                        <button onClick={(e) => this.removeUser(item)}
+                                                className="btn btn-small">Delete
+                                        </button>
                                     </td>
                                 </tr>))
                             }

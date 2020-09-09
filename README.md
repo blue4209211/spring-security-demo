@@ -15,7 +15,8 @@
 * Roles is group of permissions, System has following default roles, new roles can be easily created -
     * SUPER_ADMIN - only users in System account (inital acount) can be Super Admin, they have access to full user
     * ACCOUNT_ADMIN - All the users which have admin previledges in given account
-    * ACCOUNT_USER - All the user which have readonly access in given account 
+    * ACCOUNT_SECURITY_ENGINEER - All the ADMIN ACCESS in READ Only Mode
+    * ACCOUNT_DEVELOPER - All the SECURITY_ENGINEER ACCESS except Account EVENTS
     * DATA_ACCESS - They are treated as nomal account with restricted access ie. can upload files only
 * An user can be part of multiple accounts, similarly an account can have multiple users
 * Both Use Roles and Permissions get stored in DB, and its easier to create new roles based on requirements (they are just permission groupings)

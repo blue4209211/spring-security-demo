@@ -13,7 +13,8 @@ public enum DefaultSystemRolesEnum {
     SUPER_ADMIN(AdminPermissionsEnum.SUPER_ADMIN),
     DATA_ACCESS(DataPermissionsEnum.ACCOUNT_UPLOAD_FILE),
     ACCOUNT_ADMIN(AccountsPermissionsEnum.values()),
-    ACCOUNT_USER(AccountsPermissionsEnum.ACCOUNT_LIST_AGENT, AccountsPermissionsEnum.ACCOUNT_LIST_USER, AccountsPermissionsEnum.ACCOUNT_LIST_EVENTS);
+    ACCOUNT_DEVELOPER(AccountsPermissionsEnum.ACCOUNT_LIST_TOKEN, AccountsPermissionsEnum.ACCOUNT_LIST_USER),
+    ACCOUNT_SECURITY_ENGINEER(AccountsPermissionsEnum.ACCOUNT_LIST_TOKEN, AccountsPermissionsEnum.ACCOUNT_LIST_USER, AccountsPermissionsEnum.ACCOUNT_LIST_EVENTS);
 
     private Set<PermissionEnum> permissions;
 

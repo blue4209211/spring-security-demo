@@ -1,6 +1,6 @@
 package com.demo.controller;
 
-import com.demo.controller.payload.AgentFileuploadResponse;
+import com.demo.controller.payload.FileuploadResponse;
 import com.demo.repository.model.Account;
 import com.demo.security.CurrentUser;
 import com.demo.security.IUserPrincipal;
@@ -23,11 +23,11 @@ public class DataController {
     private AuthorizationUtils authorizationUtils;
 
     @PostMapping(value = "/{accountId}/uploadFile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public AgentFileuploadResponse uploadFile(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal,
-                                              @RequestParam("file") MultipartFile file) throws Exception {
-        Account account = authorizationUtils.loggedInAgentAuthorizedToUploadFile(accountId, userPrincipal);
+    public FileuploadResponse uploadFile(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal,
+                                         @RequestParam("file") MultipartFile file) throws Exception {
+        Account account = authorizationUtils.isloggedInUserAuthorized(accountId, userPrincipal, DataPermissionsEnum.ACCOUNT_UPLOAD_FILE);
         String fileName = fileStorageService.storeFile(account, userPrincipal, file);
-        return new AgentFileuploadResponse(fileName);
+        return new FileuploadResponse(fileName);
     }
 
 }

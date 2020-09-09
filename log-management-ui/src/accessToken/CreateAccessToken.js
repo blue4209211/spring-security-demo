@@ -48,8 +48,7 @@ class CreateAgentForm extends Component {
 
         createAccessTokens(signUpRequest)
             .then(response => {
-                console.log(response);
-                Alert.success(`You're successfully registered with accessKey - "${response.clientId}" and secret - "${response.clientSecret}"`);
+                window.confirm(`You're successfully registered with accessKey - "${response.clientId}" and secret - "${response.clientSecret}". Please copy your secret Key, it wont be displayed again`);
                 this.props.history.push("/access-tokens");
             }).catch(error => {
             Alert.error((error && error.message) || 'Oops! Something went wrong. Please try again!');

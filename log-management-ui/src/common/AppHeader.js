@@ -56,7 +56,7 @@ class AppHeader extends Component {
 
                                     }
                                     {
-                                        this.props.hasRole(["SUPER_ADMIN","ACCOUNT_ADMIN","ACCOUNT_USER"]) ?
+                                        this.props.hasRole(["SUPER_ADMIN","ACCOUNT_ADMIN","ACCOUNT_DEVELOPER"]) ?
                                             <li>
                                                 <NavLink to="/access-tokens">Access Tokens</NavLink>
                                             </li>
@@ -64,14 +64,14 @@ class AppHeader extends Component {
 
                                     }
                                     {
-                                        this.props.hasRole(["SUPER_ADMIN","ACCOUNT_ADMIN","ACCOUNT_USER"]) ?
+                                        this.props.hasRole(["SUPER_ADMIN","ACCOUNT_ADMIN","ACCOUNT_DEVELOPER","ACCOUNT_SECURITY_ENGINEER"]) ?
                                             <li>
                                                 <NavLink to="/users">Users</NavLink>
                                             </li>
                                             : ""
                                     }
                                     {
-                                        this.props.hasRole(["SUPER_ADMIN","ACCOUNT_ADMIN"]) ?
+                                        this.props.hasRole(["SUPER_ADMIN","ACCOUNT_ADMIN","ACCOUNT_SECURITY_ENGINEER"]) ?
                                             <li>
                                                 <NavLink to="/events">Audit Events</NavLink>
                                             </li>

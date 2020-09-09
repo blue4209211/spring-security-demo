@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Transactional
@@ -44,31 +45,7 @@ public class AuthorizationUtils {
         return accountOptional.get();
     }
 
-    public Account loggedInUserAuthorizedToCreateEntity(long accountId, @CurrentUser IUserPrincipal userPrincipal) {
-        Account account = getAccountOrThrowError(accountId);
-
-        Set<AccountUserRole> userAccountRoles = accountUserRoleRepository.findByAccountIdAndUserId(accountId, userPrincipal.getId());
-        Set<Long> userAccountIds = userAccountRoles.stream().map(aur -> aur.getAccount().getId()).collect(Collectors.toSet());
-        Set<String> userRoles = userAccountRoles.stream()
-                .flatMap(aur -> aur.getRole()
-                        .getPermissionRoles()
-                        .stream()
-                        .map(pr -> pr.getPermission().getName()))
-                .collect(Collectors.toSet());
-
-        Set<PermissionEnum> permissionToCheck = null;
-        if (!userAccountIds.contains(accountId)) {
-            permissionToCheck = DefaultSystemRolesEnum.SUPER_ADMIN.permissions();
-        } else {
-            permissionToCheck = DefaultSystemRolesEnum.ACCOUNT_ADMIN.permissions();
-        }
-
-        permissionsExistsElseThrowError(userRoles, permissionToCheck);
-
-        return account;
-    }
-
-    public Account loggedInUserAuthorizedToListEntity(long accountId, IUserPrincipal userPrincipal) {
+    public Account isloggedInUserAuthorized(long accountId, IUserPrincipal userPrincipal, PermissionEnum ... permissions) {
         Account account = getAccountOrThrowError(accountId);
         Set<AccountUserRole> userAccountRoles = accountUserRoleRepository.findByAccountIdAndUserId(accountId, userPrincipal.getId());
         Set<Long> userAccountIds = userAccountRoles.stream().map(aur -> aur.getAccount().getId()).collect(Collectors.toSet());
@@ -82,35 +59,10 @@ public class AuthorizationUtils {
         if (!userAccountIds.contains(accountId)) {
             permissionsExistsElseThrowError(userRoles, DefaultSystemRolesEnum.SUPER_ADMIN.permissions());
         } else {
-            Set<PermissionEnum> permissions = new HashSet<>();
-            permissions.addAll(DefaultSystemRolesEnum.ACCOUNT_ADMIN.permissions());
-            permissions.addAll(DefaultSystemRolesEnum.ACCOUNT_USER.permissions());
-            permissionsExistsElseThrowError(userRoles, permissions);
+            permissionsExistsElseThrowError(userRoles, Stream.of(permissions).collect(Collectors.toSet()));
         }
 
         return account;
-    }
-
-    public Account loggedInAgentAuthorizedToUploadFile(long accountId, IUserPrincipal userPrincipal) {
-        Account account = getAccountOrThrowError(accountId);
-
-        Set<AccountUserRole> userAccountRoles = accountUserRoleRepository.findByAccountIdAndUserId(accountId, userPrincipal.getId());
-        Set<Long> userAccountIds = userAccountRoles.stream().map(aur -> aur.getAccount().getId()).collect(Collectors.toSet());
-        Set<String> userRoles = userAccountRoles.stream()
-                .flatMap(aur -> aur.getRole()
-                        .getPermissionRoles()
-                        .stream()
-                        .map(pr -> pr.getPermission().getName()))
-                .collect(Collectors.toSet());
-
-        if (!userAccountIds.contains(accountId)) {
-            permissionsExistsElseThrowError(userRoles, DefaultSystemRolesEnum.SUPER_ADMIN.permissions());
-        } else {
-            permissionsExistsElseThrowError(userRoles, DefaultSystemRolesEnum.DATA_ACCESS.permissions());
-        }
-
-        return account;
-
     }
 
     private static void permissionsExistsElseThrowError(Set<String> userAccountPermissions, Set<PermissionEnum> permissionsToCheck) {

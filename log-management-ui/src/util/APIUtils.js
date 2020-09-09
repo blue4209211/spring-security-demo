@@ -103,6 +103,14 @@ export function deleteAccessTokens(agentId) {
     });
 }
 
+export function deleteUser(userId) {
+    return request({
+        url: `${API_BASE_URL}/accounts/${account.id}/users/${userId}`,
+        method: 'DELETE'
+    });
+}
+
+
 
 
 export function getCurrentAccountEvents() {
