@@ -1,0 +1,44 @@
+
+spring:
+    datasource:
+        url:  ${APP_DB_JDBC_URL:jdbc:postgresql://localhost:5432/logs_management}
+        username: ${APP_DB_USER:postgres}
+        password: ${APP_DB_PASSWORD:root}
+        driver-class-name: org.postgresql.Driver
+    jpa:
+        show-sql: true
+        hibernate:
+            ddl-auto: update
+            naming-strategy: org.hibernate.cfg.ImprovedNamingStrategy
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+    security:
+      oauth2:
+        client:
+          registration:
+            google:
+              clientId: ${APP_AUTH_GOOGLE_CLIENT_ID}
+              clientSecret: ${APP_AUTH_GOOGLE_CLIENT_SECRET}
+              redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+              scope:
+                - email
+                - profile
+app:
+  uploadDir: ${APP_DATA_LOCAL_DIR:D:\tmp\uploadDir}
+  admin:
+    password: ${APP_ADMIN_PASSWORD:password}
+    userName: ${APP_ADMIN_EMAIL:admin@system.com}
+    email: ${APP_ADMIN_EMAIL:admin@system.com}
+    accountName: system
+  auth:
+    tokenSecret: 926D96C90030DD58429D2751AC1BDBBC
+    tokenExpirationMsec: 864000000
+  oauth2:
+    # After successfully authenticating with the OAuth2 Provider,
+    # we'll be generating an auth token for the user and sending the token to the
+    # redirectUri mentioned by the client in the /oauth2/authorize request.
+    # We're not using cookies because they won't work well in mobile clients.
+    authorizedRedirectUris:
+      - ${APP_AUTH_OAUTH_REDIRECT_URL:http://localhost:3000/oauth2/redirect}
+

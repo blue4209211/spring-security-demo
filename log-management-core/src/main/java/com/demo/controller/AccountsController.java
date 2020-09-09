@@ -1,0 +1,215 @@
+package com.demo.controller;
+
+import com.demo.config.AppProperties;
+import com.demo.controller.payload.*;
+import com.demo.exception.BadRequestException;
+import com.demo.exception.ResourceNotFoundException;
+import com.demo.repository.*;
+import com.demo.repository.model.*;
+import com.demo.security.*;
+import com.demo.util.AuthorizationUtils;
+import com.demo.util.PasswordUtils;
+import com.demo.util.SerializationUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+
+import javax.validation.Valid;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/accounts")
+@Transactional
+public class AccountsController {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AccountsController.class);
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private UserAttrRepository userAttrRepository;
+
+    @Autowired
+    private AccountUserRoleRepository accountUserRoleRepository;
+
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AuthorizationUtils authorizationUtils;
+
+    @Autowired
+    private AppProperties appProperties;
+
+    @Autowired
+    private AuditEventLogRepository auditEventLogRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @GetMapping("/{accountId}/events")
+    public List<AuditEventLog> getAccountEvents(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal) {
+        Account account = authorizationUtils.loggedInUserAuthorizedToListEntity(accountId, userPrincipal);
+        return auditEventLogRepository.findByAccountIdOrderByTimestampDesc(account.getId());
+    }
+
+
+    @GetMapping("/{accountId}/users")
+    public List<UserAccountOnlyDescribeResponse> getAllUser(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal) {
+        Account account = authorizationUtils.loggedInUserAuthorizedToListEntity(accountId, userPrincipal);
+        return userRepository.findByUserTypeAndRolesAccount(UserTypeEnum.USER, account)
+                .stream()
+                .map(u -> new UserAccountOnlyDescribeResponse(u, account))
+                .collect(Collectors.toList());
+    }
+
+    @PostMapping("/{accountId}/users")
+    public UserAccountRegisterResponse registerUserToAccount(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal, @Valid @RequestBody UserAccountRegisterRequest userRegisterRequest) {
+        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+        if (appProperties.getAdmin().getAccountId() == accountId && userRegisterRequest.getRole() == DefaultSystemRolesEnum.SUPER_ADMIN) {
+            throw new BadRequestException("SUPER_ADMIN Role is not allowed");
+        }
+
+        Optional<User> userOptional = userRepository.findByUserId(userRegisterRequest.getUserId());
+        if (!userOptional.isPresent()) {
+            User user = new User(userRegisterRequest.getUserId());
+            user.setProvider(AuthProviderEnum.google);
+            user.setStatus(ModelStatusEnum.DISABLED);
+            final UserAttr emailAttr = new UserAttr(UserAttr.USER_EMAIL, userRegisterRequest.getUserId(), user);
+            user.setUserAttrs(Arrays.asList(emailAttr));
+            user = userRepository.save(user);
+            userOptional = Optional.of(user);
+        }
+        Optional<Role> role = roleRepository.getByNameIgnoreCase(userRegisterRequest.getRole().name());
+        accountUserRoleRepository.save(new AccountUserRole(account, userOptional.get(), role.get()));
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("role", userRegisterRequest.getRole().toString());
+        data.put("user", userOptional.get().getId());
+        try {
+            auditEventLogRepository.save(new AuditEventLog(accountId, userPrincipal.getId(), "ACCOUNT_USER_CREATE", SerializationUtils.toJSONString(data)));
+        } catch (Exception e) {
+            LOGGER.error("unable to store audit events", e);
+        }
+
+        return new UserAccountRegisterResponse(userOptional.get(), account);
+    }
+
+
+    @GetMapping("/{accountId}/users/me")
+    public UserAccountOnlyDescribeResponse getAccounttUser(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal) {
+        Account account = authorizationUtils.getAccountOrThrowError(accountId);
+        return new UserAccountOnlyDescribeResponse(userRepository.getOne(userPrincipal.getId()), account);
+    }
+
+    @GetMapping("/{accountId}/users/{userId}")
+    public UserAccountOnlyDescribeResponse getUser(@PathVariable("accountId") Long accountId, @PathVariable("userId") Long userId, @CurrentUser IUserPrincipal userPrincipal) {
+        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+
+        Optional<User> u = userRepository.findById(userPrincipal.getId());
+        if (u.isPresent()) {
+            return new UserAccountOnlyDescribeResponse(u.get(), account);
+        }
+        throw new ResourceNotFoundException("user", "id", userId);
+    }
+
+    @DeleteMapping("/{accountId}/users/{userId}")
+    public UserDeleteFromAccountResponse deleteUser(@CurrentUser IUserPrincipal userPrincipal, @PathVariable("accountId") long accountId, @PathVariable("userId") long userId) {
+        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+        Optional<User> userOptional = userRepository.findById(userId);
+        if (!userOptional.isPresent()) {
+            throw new ResourceNotFoundException("user", "id", userId);
+        }
+        if (accountId == appProperties.getAdmin().getAccountId() && userOptional.get().getUserId().equalsIgnoreCase(appProperties.getAdmin().getUserName())) {
+            throw new BadRequestException("User Account cannot be deleted");
+        }
+
+        accountUserRoleRepository.deleteByAccountAndUser(account, userOptional.get());
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("user", userOptional.get().getId());
+        try {
+            auditEventLogRepository.save(new AuditEventLog(accountId, userPrincipal.getId(), "ACCOUNT_USER_REMOVE", SerializationUtils.toJSONString(data)));
+        } catch (Exception e) {
+            LOGGER.error("unable to store audit events", e);
+        }
+
+        return new UserDeleteFromAccountResponse(account.getId(), userOptional.get().getId());
+    }
+
+
+    @GetMapping("/{accountId}/tokens")
+    public List<UserAccountOnlyDescribeResponse> getAllAgents(@PathVariable("accountId") Long accountId, @CurrentUser IUserPrincipal userPrincipal) {
+        Account account = authorizationUtils.loggedInUserAuthorizedToListEntity(accountId, userPrincipal);
+        return userRepository.findByUserTypeAndRolesAccount(UserTypeEnum.AGENT, account)
+                .stream()
+                .map(u -> new UserAccountOnlyDescribeResponse(u, account))
+                .collect(Collectors.toList());
+    }
+
+    @PostMapping("/{accountId}/tokens")
+    public ResponseEntity<?> registerAgent(@PathVariable("accountId") long accountId, @CurrentUser IUserPrincipal userPrincipal, @Valid @RequestBody TokenCreateRequest signUpRequest) {
+        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+
+        String clientSecret = PasswordUtils.generateSecureRandomPassword();
+        User agent = new User(String.format("%s-%s-%s", accountId, System.currentTimeMillis(), "client-id"), passwordEncoder.encode(clientSecret));
+
+        final HashSet<AccountUserRole> roles = new HashSet<AccountUserRole>();
+        Optional<Role> role = roleRepository.getByNameIgnoreCase(DefaultSystemRolesEnum.DATA_ACCESS.name());
+        roles.add(new AccountUserRole(account, agent, role.get()));
+        agent.setRoles(roles);
+        agent.setUserType(UserTypeEnum.AGENT);
+
+        final List<UserAttr> userAttrs = new ArrayList<>();
+        userAttrs.add(new UserAttr(UserAttr.USER_NAME, signUpRequest.getName(), agent));
+        agent.setUserAttrs(userAttrs);
+
+        User result = userRepository.save(agent);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", result.getId());
+        data.put("name", signUpRequest.getName());
+        try {
+            auditEventLogRepository.save(new AuditEventLog(accountId, userPrincipal.getId(), "ACCOUNT_TOKEN_CREATE", SerializationUtils.toJSONString(data)));
+        } catch (Exception e) {
+            LOGGER.error("unable to store audit events", e);
+        }
+
+
+        AgentCreateResponse res = new AgentCreateResponse();
+        res.setClientId(agent.getUserId());
+        res.setClientSecret(clientSecret);
+        return ResponseEntity.ok(res);
+    }
+
+    @DeleteMapping("/{accountId}/tokens/{tokenId}")
+    public UserDeleteFromAccountResponse deleteToken(@CurrentUser IUserPrincipal userPrincipal, @PathVariable("accountId") Long accountId, @PathVariable("tokenId") Long tokenId) {
+        Account account = authorizationUtils.loggedInUserAuthorizedToCreateEntity(accountId, userPrincipal);
+
+        if (!userRepository.existsById(tokenId)) {
+            throw new ResourceNotFoundException("token", "id", tokenId);
+        }
+        userRepository.deleteById(tokenId);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", tokenId);
+        try {
+            auditEventLogRepository.save(new AuditEventLog(accountId, userPrincipal.getId(), "ACCOUNT_TOKEN_DELETE", SerializationUtils.toJSONString(data)));
+        } catch (Exception e) {
+            LOGGER.error("unable to store audit events", e);
+        }
+
+
+        return new UserDeleteFromAccountResponse(accountId, tokenId);
+    }
+
+}

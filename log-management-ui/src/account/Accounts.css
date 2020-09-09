@@ -1,0 +1,58 @@
+.account-container {
+    padding-top: 30px;
+    text-align: center;
+}
+
+.account-list-title {
+    font-size: 1.5em;
+    font-weight: 500;
+    margin-top: 0;
+    margin-bottom: 30px;
+    color: rgba(0, 0, 0, 0.65);
+}
+
+.account-info {
+    background: #fff;
+    box-shadow: 0 1px 11px rgba(0, 0, 0, 0.27);
+    border-radius: 2px;
+    width: 500px;
+    display: inline-block;
+    margin-top: 30px;
+    vertical-align: middle;
+    position: relative;
+    padding: 35px;
+}
+
+#account-listing {
+    font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#account-listings-container {
+    margin-top: 50px;
+}
+
+#account-listing td, #account-listing th {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+#account-listing tr:nth-child(even){background-color: #f2f2f2;}
+
+#account-listing tr:hover {background-color: #ddd;}
+
+#account-listing th {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    text-align: left;
+    background-color: #40a9ff;
+    color: white;
+}
+
+#account-listing td {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    text-align: left;
+    width: 100px;
+}
